@@ -53,6 +53,18 @@ def transaction_mail_sending(user, subject, amount, template):
     send_email.send()
 
 
+def transaction_mail_receiver(receiver, sender, balance, subject, amount, template):
+    message = render_to_string(template, {
+        'receiver': receiver,
+        'sender': sender,
+        'balance': balance,
+        'amount': amount
+    })
+    send_email = EmailMultiAlternatives(subject, '', to=[receiver])
+    send_email.attach_alternative(message, 'text/html')
+    send_email.send()
+
+
 class DepositMoneyView(TransactionCreateMixin):
     form_class = DepositForm
     title = 'Deposit'
@@ -221,6 +233,9 @@ class BalanceTransferView(LoginRequiredMixin, CreateView):
         try:
             to_account = UserBankAccount.objects.get(
                 account_no=transfer_to_account)
+            to_account_email = to_account.user.email
+            to_account_balance = to_account.balance
+            print(to_account_balance)
         except UserBankAccount.DoesNotExist:
             messages.error(self.request, 'Destination account not found.')
             return self.form_invalid(form)
@@ -239,6 +254,8 @@ class BalanceTransferView(LoginRequiredMixin, CreateView):
             messages.success(self.request, 'Transfer successful.')
             transaction_mail_sending(
                 self.request.user, "Transfer Message", transfer_amount, 'transactions/transfer_email.html')
+            transaction_mail_receiver(to_account_email, self.request.user, to_account_balance, "Deposit Message",
+                                      transfer_amount, 'transactions/transfer_email_to_receiver.html')
             return super().form_valid(form)
         else:
             messages.error(
